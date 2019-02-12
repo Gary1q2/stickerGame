@@ -2,8 +2,8 @@ var socket = io();
 var wordArray = [];
 var playerNum = 0;
 var playerName = "";
-var xPos = -100;
-var yPos = -100;
+var xPos = 100;
+var yPos = 100;
 var size = 20;
 document.getElementById('userInput').focus();
 
