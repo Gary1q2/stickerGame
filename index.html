@@ -1,0 +1,86 @@
+<html>
+  <head>
+    <title>A Multiplayer Game</title>
+    <script src="/socket.io/socket.io.js"></script>
+  </head>
+  <body>
+    <canvas id="canvas"></canvas>
+    <div id="hud">
+      <input id="message" type="text"></input>
+      <!--
+      <input id="xPos" type="text" style="width:45px"></input>
+      <input id="yPos" type="text" style="width:45px"></input>
+      <select id="size" style="width:80px">
+        <option selected="">20</option>
+        <option>20</option>
+        <option>30</option>
+        <option>40</option>
+      </select>
+      -->
+      <button id="sendButton" type="button" onclick="sendMessage()" style="width:100px">Submit</button>
+      <!--<button id="disconnect" type="button" onclick="disconnect()" style="width:100px">Disconnect</button>-->
+    </div>
+    <div id="playerNum"></div>
+    <div id="playerName"></div>
+    <div id="login">
+      Enter your name: <input id="userInput" type="text">
+      <button id="loginButton" type="button" onclick="setName()">Enter</button>
+    </div>
+  </body>
+  <script src="/static/game.js"></script>
+</html>
+
+<style>
+#login {
+    position: fixed;
+    padding: 5px;
+    margin: auto;
+    border: 1px solid black;
+    background-color: white;
+    left: 40%;
+    top: 40%;
+}
+#hud {
+    display: none;
+    position: fixed;
+    bottom: 20px;
+    left: 40%;
+    width: 400px;  
+    padding: 10px;
+    text-align: center;
+    border: 1px solid black;
+    background-color: white;
+}
+body, html {
+  padding: 0px;
+  margin: 0px;
+  background-color: rgba(221, 221, 221, 0.4);
+}
+#canvas {
+    width: 3000px;
+    height: 2000px;
+    margin: 10px;
+    border: 1px solid rgba(221, 221, 221, 0.4);
+    background-color: white;
+    background-image: linear-gradient(rgba(221, 221, 221, 0.4) .1em, transparent .1em), linear-gradient(90deg, rgba(221, 221, 221, 0.4) .1em, transparent .1em);
+    background-size: 1em 1em;
+}  
+#playerNum {
+    display: none;
+    position: fixed;
+    bottom: 30px;
+    left: 40px;
+    padding: 5px;
+    border: 1px solid black;
+    background-color: white;
+}
+#playerName {
+    display: none;
+    position: fixed;
+    bottom: 30px;
+    right: 40px;
+    border: 1px solid black;
+    background-color: white;
+    padding: 5px;
+}
+</style>
