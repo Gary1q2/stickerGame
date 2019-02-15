@@ -3,11 +3,15 @@ var express = require('express');
 var http = require('http');
 var path = require('path');
 var socketIO = require('socket.io');
+var mongoClient = require('mongodb').MongoClient;
+
 var app = express();
 var server = http.Server(app);
 var io = socketIO(server);
+var dbURL = "mongodb://localhost:27017/";
+
+
 app.set('port', (process.env.PORT || 8080));
-console.log("test port = " + app.get('port'))
 app.use('/static', express.static(__dirname + '/static'));
 
 // Routing
@@ -20,14 +24,6 @@ server.listen(app.get('port'), function() {
   console.log(`Starting server on port ${app.get('port')}`);
 });
 
-// Add the WebSocket handlers 
-io.on('connection', function(socket) {
-
-});
-
-// Player and word database
-var wordArray = []
-var players = {};
 
 io.on('connection', function(socket) {
 
@@ -36,17 +32,38 @@ io.on('connection', function(socket) {
 
         // Check if there is even a name
 		if (data) {
-			players[socket.id] = {
-				name: data
-			};
-			console.log("[" + players[socket.id].name + "] joined -------------- Players online = " + Object.keys(players).length);
+			console.log("name submitted");
+			// Add the player's name to the 'players' database
+			mongoClient.connect(dbURL, {useNewUrlParser: true}, function(err, db) {
+			    if (err) throw err;
+			    var dbo = db.db("mydb");
+			    dbo.collection("players").insertOne({name: data, id: socket.id}, function(err) {
+					if (err) throw err;
+					dbo.collection("players").countDocuments({}, function(err, playerNum) {
+					    if (err) throw err;
+					    console.log("[" + data + "] has joined with id [" + socket.id + "] ------------- total players online = " + playerNum);
+						io.sockets.emit('playerNum', playerNum);   // Update players on player count
+					    db.close();
+					});		
+				});
+			});
 
-			// Send current word state to new player
-			socket.emit('wordState', wordArray);
+			console.log("before word mongo");
+			// Update new player about the current word state
+			mongoClient.connect(dbURL, {useNewUrlParser: true}, function(err, db) {
+				if (err) throw err;
+				var dbo = db.db("mydb");
+				dbo.collection("words").find({}).toArray(function(err, res) {
+					if (err) throw err;
+					socket.emit('wordState', res);
+					console.log(res);
+					db.close();
+				});
+			});
 
-			// Send updated player count
-			io.sockets.emit('playerNum', Object.keys(players).length);
+			console.log("awaiting callback??");
 		} else {
+			console.log("no name submitted");
 			socket.emit('nullName');
 		}
 	});
@@ -54,9 +71,32 @@ io.on('connection', function(socket) {
     // Receive a message submission from a player
 	socket.on('message', function(data) {
 		if ((data.size == 20 || data.size == 30 || data.size == 40) && (data.string)) {
-			wordArray.push(data);
-			console.log("Received a legit message = " + data.string + " ------------- wordArray size = " + wordArray.length); 	
-		    io.sockets.emit('wordState', wordArray);
+
+			// Add the word to the 'words' database
+			mongoClient.connect(dbURL, {useNewUrlParser: true}, function(err, db) {
+			    if (err) throw err;
+			    var dbo = db.db("mydb");
+			    dbo.collection("words").insertOne(data, function(err) {
+					if (err) throw err;
+					console.log("Word = [" + data.string + "] added to 'words' collection");
+					dbo.collection("words").countDocuments({}, function(err, totalDocs) {
+						if (err) throw err;
+						console.log("Received a legit message = " + data.string + " ------------- word's database size = " + totalDocs);
+						db.close()
+					});
+				});
+			});
+
+			// Update all players about the new word state
+			mongoClient.connect(dbURL, {useNewUrlParser: true}, function(err, db) {
+				if (err) throw err;
+				var dbo = db.db("mydb");
+				dbo.collection("words").find({}).toArray(function(err, res) {
+					if (err) throw err;
+					io.sockets.emit('wordState', res);
+					db.close();
+				});
+			});
 		    socket.emit('clearInput');
 
 	    // Invalid string or illegal font
@@ -67,9 +107,22 @@ io.on('connection', function(socket) {
 
 	// Disconnect player and remove from data
 	socket.on('disconnect', function() {
-		console.log("Player["+socket.id+"] PRESSED DISCONNECT!!! ------------- Players online = " + Object.keys(players).length);
-		delete players[socket.id];
-		io.sockets.emit('playerNum', Object.keys(players).length);
+		// Remove the player from the 'players' database
+		mongoClient.connect(dbURL, {useNewUrlParser: true}, function(err, db) {
+		    if (err) throw err;
+		    var dbo = db.db("mydb");
+		    dbo.collection("players").findOne({id: socket.id}, function(err, res) {
+				if (err) throw err;
+				dbo.collection("players").deleteOne({id: socket.id}, function(err) {
+					if (err) throw err;
+					console.log(res.name + " with id [" + socket.id + "] DISCONNECTED!!! ---- removed from database");
+					db.close();
+				});
+			});
+		});
+
+		// Tell other players to update their player counts
+		io.sockets.emit('playerNum');
 	});
 });
 

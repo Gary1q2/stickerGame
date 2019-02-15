@@ -1,10 +1,9 @@
 var socket = io();
-var wordArray = [];
-var playerNum = 0;
 var playerName = "";
 var xPos = 100;
 var yPos = 100;
 var size = 20;
+var wordState = null;
 document.getElementById('userInput').focus();
 
 //trying to understand canvas.width versus style 
@@ -20,6 +19,11 @@ context.font = size + "px Arial";
 // New word from the server, update canvas
 socket.on('wordState', function(data) {
 
+	// Save a copy of the wordState for later use
+    wordState = data;
+
+    console.log(wordState);
+
 	// Remove login form if it's still there
 	if (document.getElementById('login').style.display != "none") {
 		document.getElementById('login').style.display = "none";
@@ -27,15 +31,12 @@ socket.on('wordState', function(data) {
 		document.getElementById('playerNum').style.display = "block";
 		document.getElementById('playerName').style.display = "block";
 	}
-
-	wordArray = data;
 	updateCanvas(); 
 });
 
 // Player number updated
 socket.on('playerNum', function(data) {
-    playerNum = data;
-    document.getElementById('playerNum').innerHTML = "Players online: " + playerNum;
+    document.getElementById('playerNum').innerHTML = "Players online: " + data;
     console.log("got the num packet =" + data);
 });
 
@@ -155,10 +156,14 @@ function drawCoords() {
 
 // Draw the words onto the canvas
 function drawWords() {
-    for (var worder = 0; worder < wordArray.length; worder++) {
-    	context.font = wordArray[worder].size + "px Arial";
-    	context.fillText(wordArray[worder].string, wordArray[worder].x, wordArray[worder].y)
-    }  	
+
+	// Draw out each word in the array of word objects
+	for (object in wordState) {
+		var word = wordState[object];
+		console.log(word.string); 
+		context.font = word.size + "px Arial";
+	    context.fillText(word.string, word.x, word.y);
+	}
 }
 
 // Draw the pointer on the canvas
