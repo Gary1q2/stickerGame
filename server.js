@@ -32,7 +32,7 @@ io.on('connection', function(socket) {
 
         // Check if there is even a name
 		if (data) {
-			console.log("name submitted");
+
 			// Add the player's name to the 'players' database
 			mongoClient.connect(dbURL, {useNewUrlParser: true}, function(err, db) {
 			    if (err) throw err;
@@ -48,7 +48,6 @@ io.on('connection', function(socket) {
 				});
 			});
 
-			console.log("before word mongo");
 			// Update new player about the current word state
 			mongoClient.connect(dbURL, {useNewUrlParser: true}, function(err, db) {
 				if (err) throw err;
@@ -56,12 +55,9 @@ io.on('connection', function(socket) {
 				dbo.collection("words").find({}).toArray(function(err, res) {
 					if (err) throw err;
 					socket.emit('wordState', res);
-					console.log(res);
 					db.close();
 				});
 			});
-
-			console.log("awaiting callback??");
 		} else {
 			console.log("no name submitted");
 			socket.emit('nullName');
@@ -72,32 +68,33 @@ io.on('connection', function(socket) {
 	socket.on('message', function(data) {
 		if ((data.size == 20 || data.size == 30 || data.size == 40) && (data.string)) {
 
-			// Add the word to the 'words' database
+			// Initialise connection to mongoDB
 			mongoClient.connect(dbURL, {useNewUrlParser: true}, function(err, db) {
 			    if (err) throw err;
 			    var dbo = db.db("mydb");
+
+			    // Add the word to the 'words' database
 			    dbo.collection("words").insertOne(data, function(err) {
 					if (err) throw err;
 					console.log("Word = [" + data.string + "] added to 'words' collection");
+
+					// Count the number of words in database
 					dbo.collection("words").countDocuments({}, function(err, totalDocs) {
 						if (err) throw err;
 						console.log("Received a legit message = " + data.string + " ------------- word's database size = " + totalDocs);
-						db.close()
+					});
+
+					// Update all players about the new word state
+					dbo.collection("words").find({}).toArray(function(err, res) {
+						if (err) throw err;
+						io.sockets.emit('wordState', res);
+						db.close();
 					});
 				});
 			});
 
-			// Update all players about the new word state
-			mongoClient.connect(dbURL, {useNewUrlParser: true}, function(err, db) {
-				if (err) throw err;
-				var dbo = db.db("mydb");
-				dbo.collection("words").find({}).toArray(function(err, res) {
-					if (err) throw err;
-					io.sockets.emit('wordState', res);
-					db.close();
-				});
-			});
-		    socket.emit('clearInput');
+			// Clear the input of the player submitting the message
+			socket.emit('clearInput');
 
 	    // Invalid string or illegal font
 		} else {
@@ -107,22 +104,32 @@ io.on('connection', function(socket) {
 
 	// Disconnect player and remove from data
 	socket.on('disconnect', function() {
+
 		// Remove the player from the 'players' database
 		mongoClient.connect(dbURL, {useNewUrlParser: true}, function(err, db) {
 		    if (err) throw err;
 		    var dbo = db.db("mydb");
 		    dbo.collection("players").findOne({id: socket.id}, function(err, res) {
 				if (err) throw err;
-				dbo.collection("players").deleteOne({id: socket.id}, function(err) {
-					if (err) throw err;
-					console.log(res.name + " with id [" + socket.id + "] DISCONNECTED!!! ---- removed from database");
+
+				// Remove player ONLY if he is already in database
+				if (res) {
+					dbo.collection("players").deleteOne({id: socket.id}, function(err) {
+						if (err) throw err;
+						console.log(res.name + " with id [" + socket.id + "] DISCONNECTED!!! ---- removed from database");
+
+						// Tell other players to update their player counts
+						dbo.collection("players").countDocuments({}, function(err, playerNum) {
+							if (err) throw err;
+							io.sockets.emit('playerNum', playerNum);
+							db.close()
+						});
+					});					
+				} else {
 					db.close();
-				});
+				}
 			});
 		});
-
-		// Tell other players to update their player counts
-		io.sockets.emit('playerNum');
 	});
 });
 
