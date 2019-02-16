@@ -24,6 +24,10 @@ server.listen(app.get('port'), function() {
   console.log(`Starting server on port ${app.get('port')}`);
 });
 
+process.on('SIGINT', function() {
+	console.log("I'm shutting down baiii");
+	process.exit()
+});
 
 io.on('connection', function(socket) {
 
